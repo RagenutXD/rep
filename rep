@@ -1,0 +1,90 @@
+#!/bin/bash
+
+config_file="$HOME/.config/rep/config.json"
+cmd=""
+buffer="*"
+
+sb=false  # if buffer has been set
+
+init() {
+    mkdir -p $HOME/.config/rep/
+    if [ -e "$config_file" ]; then
+        true
+    else
+        touch "$config_file"
+        echo '{"*":""}' > $config_file
+    fi
+}
+
+usage() {
+    echo 'Usage: rep [bufname] -s [cmd]'
+}
+
+list() {
+    echo -en "${config_file}\n" | python -c '
+    import json
+    filepath = input()
+    data={}
+    with open(filepath, "r+") as f:
+        data=json.load(f)
+    for k,v in data.items():
+        print(f"{k} ----> {v}")
+    '
+}
+
+initcmd() {
+    cmd=$(echo -en "${config_file}\n${buffer}" | python -c '
+    import json
+    filepath = input()
+    buffer = input()
+    with open(filepath, "r+") as f:
+        data = json.load(f)
+    if not data.get(buffer):
+        print("")
+    else:
+        print(data[buffer])
+        ' )
+}
+
+setcmd() {
+    cmd="${OPTARG}"
+    echo "${OPTARG}"
+    echo -en "${config_file}\n${buffer}\n${cmd}" | python -c '
+    import json
+    filepath = input()
+    buffer = input()
+    cmd = input()
+    print(f"{buffer} --> {cmd}")
+    data = {}
+    with open(filepath, "r+") as f:
+        data = json.load(f)
+    data[buffer] = cmd
+    with open(filepath, "w+") as f:
+        json.dump(data, f, indent=True)
+    '
+}
+
+init
+
+if [[ ${1:0:1} != "-" && ${1:0:1} != "" ]] ; then 
+    buffer="$1"
+    initcmd 
+    OPTIND+=1
+else
+    initcmd 
+fi
+
+
+while getopts 'lhs:' opt; do
+    case "$opt" in
+        s) 
+            setcmd 
+            ;;
+        h) usage; exit 0;;
+        l) list ; exit 0;;
+        *) exit 1;;
+    esac
+done
+
+eval "$cmd"
+
